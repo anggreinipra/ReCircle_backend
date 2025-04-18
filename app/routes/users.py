@@ -1,44 +1,74 @@
-from flask import Blueprint, request, jsonify
+from flask import request
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.database import db
 from app.models.user import User
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask_restx import Namespace, Resource, fields
 
-bp = Blueprint("users", __name__, url_prefix="/users")
+# Buat namespace khusus untuk user-related endpoints
+user_ns = Namespace('users', description='User related operations')
 
-@bp.route("/register", methods=["POST"])
-def register():
-    data = request.get_json()
-    name = data.get("name")
-    email = data.get("email")
-    password = data.get("password")
+# Swagger model untuk input user
+user_model = user_ns.model('User', {
+    'name': fields.String(required=True, description='User name'),
+    'email': fields.String(required=True, description='User email'),
+    'password': fields.String(required=True, description='User password'),
+})
 
-    if User.query.filter_by(email=email).first():
-        return jsonify({"message": "Email already registered"}), 409
+login_model = user_ns.model('Login', {
+    'email': fields.String(required=True, description='User email'),
+    'password': fields.String(required=True, description='User password'),
+})
 
-    hashed_pw = generate_password_hash(password)
-    new_user = User(name=name, email=email, password=hashed_pw)
+@user_ns.route('/register')
+class Register(Resource):
+    @user_ns.expect(user_model)
+    def post(self):
+        try:      
+            data = request.get_json()
+            name = data.get("name")
+            email = data.get("email")
+            password = data.get("password")
 
-    db.session.add(new_user)
-    db.session.commit()
+            if User.query.filter_by(email=email).first():
+                return {"message": "Email already registered"}, 409
 
-    return jsonify({"message": "User registered successfully"}), 201
+            hashed_pw = generate_password_hash(password)
+            new_user = User(name=name, email=email, password=hashed_pw)
 
-@bp.route("/login", methods=["POST"])
-def login():
-    data = request.get_json()
-    email = data.get("email")
-    password = data.get("password")
+            db.session.add(new_user)
+            db.session.commit()
 
-    user = User.query.filter_by(email=email).first()
-    if not user or not check_password_hash(user.password, password):
-        return jsonify({"message": "Invalid credentials"}), 401
+            return {"message": "User registered successfully"}, 201
+        
+        except Exception as e:
+            return {"error": str(e)}, 500
 
-    token = create_access_token(identity={"id": user.id, "role": user.role})
-    return jsonify({"access_token": token}), 200
+@user_ns.route('/login')
+class Login(Resource):
+    @user_ns.expect(login_model)
+    def post(self):
+        try:
+            data = request.get_json()
+            email = data.get("email")
+            password = data.get("password")
 
-@bp.route("/me", methods=["GET"])
-@jwt_required()
-def me():
-    current_user = get_jwt_identity()
-    return jsonify({"user": current_user})
+            user = User.query.filter_by(email=email).first()
+            if not user or not check_password_hash(user.password, password):
+                return {"message": "Invalid credentials"}, 401
+
+            token = create_access_token(identity={"id": user.id, "role": user.role})
+            return {"access_token": token}, 200
+
+        except Exception as e:
+            return {"error": str(e)}, 500
+
+@user_ns.route('/me')
+class Me(Resource):
+    @jwt_required()
+    def get(self):
+        try:
+            current_user = get_jwt_identity()
+            return {"user": current_user}, 200
+        except Exception as e:
+            return {"error": str(e)}, 500

@@ -1,67 +1,76 @@
-from flask import Blueprint, request, jsonify
+from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_restx import Namespace, Resource, fields
 from app.database import db
 from app.models.community import CommunityPost
 
-bp = Blueprint("community", __name__, url_prefix="/community")
+community_ns = Namespace('community', description='Community post operations')
 
-@bp.route("/", methods=["GET"])
-def get_posts():
-    posts = CommunityPost.query.all()
-    result = [{
-        "id": p.id,
-        "title": p.title,
-        "content": p.content,
-        "type": p.type,
-        "author_id": p.author_id,
-        "created_at": p.created_at
-    } for p in posts]
-    return jsonify(result)
+post_model = community_ns.model('CommunityPost', {
+    'title': fields.String(required=True, description='Title of the post'),
+    'content': fields.String(required=True, description='Content of the post'),
+    'type': fields.String(default='article', description='Type of post (article, tip, etc.)')
+})
 
-@bp.route("/", methods=["POST"])
-@jwt_required()
-def create_post():
-    current_user = get_jwt_identity()
-    data = request.get_json()
+@community_ns.route("/")
+class CommunityPostList(Resource):
+    def get(self):
+        posts = CommunityPost.query.all()
+        return [{
+            "id": p.id,
+            "title": p.title,
+            "content": p.content,
+            "type": p.type,
+            "author_id": p.author_id,
+            "created_at": p.created_at
+        } for p in posts]
 
-    post = CommunityPost(
-        title=data.get("title"),
-        content=data.get("content"),
-        type=data.get("type", "article"),
-        author_id=current_user["id"]
-    )
+    @community_ns.expect(post_model)
+    @jwt_required()
+    def post(self):
+        current_user = get_jwt_identity()
+        data = request.get_json()
 
-    db.session.add(post)
-    db.session.commit()
+        post = CommunityPost(
+            title=data.get("title"),
+            content=data.get("content"),
+            type=data.get("type", "article"),
+            author_id=current_user["id"]
+        )
 
-    return jsonify({"message": "Post created"}), 201
+        db.session.add(post)
+        db.session.commit()
 
-@bp.route("/<int:post_id>", methods=["PUT"])
-@jwt_required()
-def update_post(post_id):
-    current_user = get_jwt_identity()
-    post = CommunityPost.query.get_or_404(post_id)
+        return {"message": "Post created"}, 201
 
-    if post.author_id != current_user["id"]:
-        return jsonify({"message": "Unauthorized"}), 403
+@community_ns.route("/<int:post_id>")
+@community_ns.param('post_id', 'The post identifier')
+class CommunityPostDetail(Resource):
+    @community_ns.expect(post_model)
+    @jwt_required()
+    def put(self, post_id):
+        current_user = get_jwt_identity()
+        post = CommunityPost.query.get_or_404(post_id)
 
-    data = request.get_json()
-    post.title = data.get("title", post.title)
-    post.content = data.get("content", post.content)
-    post.type = data.get("type", post.type)
+        if post.author_id != current_user["id"]:
+            return {"message": "Unauthorized"}, 403
 
-    db.session.commit()
-    return jsonify({"message": "Post updated"})
+        data = request.get_json()
+        post.title = data.get("title", post.title)
+        post.content = data.get("content", post.content)
+        post.type = data.get("type", post.type)
 
-@bp.route("/<int:post_id>", methods=["DELETE"])
-@jwt_required()
-def delete_post(post_id):
-    current_user = get_jwt_identity()
-    post = CommunityPost.query.get_or_404(post_id)
+        db.session.commit()
+        return {"message": "Post updated"}
 
-    if post.author_id != current_user["id"]:
-        return jsonify({"message": "Unauthorized"}), 403
+    @jwt_required()
+    def delete(self, post_id):
+        current_user = get_jwt_identity()
+        post = CommunityPost.query.get_or_404(post_id)
 
-    db.session.delete(post)
-    db.session.commit()
-    return jsonify({"message": "Post deleted"})
+        if post.author_id != current_user["id"]:
+            return {"message": "Unauthorized"}, 403
+
+        db.session.delete(post)
+        db.session.commit()
+        return {"message": "Post deleted"}

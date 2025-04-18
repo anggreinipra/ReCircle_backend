@@ -1,89 +1,96 @@
-
-from flask import Blueprint, request, jsonify
+from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_restx import Namespace, Resource, fields
 from app.database import db
 from app.models.order import Order
 from app.models.product import Product
 
-bp = Blueprint("orders", __name__, url_prefix="/orders")
+order_ns = Namespace('orders', description='Order operations')
 
-@bp.route("/", methods=["POST"])
-@jwt_required()
-def create_order():
-    data = request.get_json()
-    current_user = get_jwt_identity()
+order_model = order_ns.model('Order', {
+    'product_id': fields.Integer(required=True, description='ID of the product to order'),
+    'quantity': fields.Integer(required=True, description='Quantity to order')
+})
 
-    product = Product.query.get_or_404(data.get("product_id"))
-    quantity = data.get("quantity")
+status_model = order_ns.model('StatusUpdate', {
+    'status': fields.String(required=True, description='New status for the order')
+})
 
-    if quantity > product.stock:
-        return jsonify({"message": "Not enough stock available"}), 400
+@order_ns.route("/")
+class OrderList(Resource):
+    @order_ns.expect(order_model)
+    @jwt_required()
+    def post(self):
+        data = request.get_json()
+        current_user = get_jwt_identity()
 
-    total_price = product.price * quantity
-    order = Order(
-        buyer_id=current_user["id"],
-        product_id=product.id,
-        quantity=quantity,
-        total_price=total_price,
-    )
+        product = Product.query.get_or_404(data.get("product_id"))
+        quantity = data.get("quantity")
 
-    # Kurangi stok
-    product.stock -= quantity
+        if quantity > product.stock:
+            return {"message": "Not enough stock available"}, 400
 
-    db.session.add(order)
-    db.session.commit()
+        total_price = product.price * quantity
+        order = Order(
+            buyer_id=current_user["id"],
+            product_id=product.id,
+            quantity=quantity,
+            total_price=total_price,
+        )
 
-    return jsonify({"message": "Order placed successfully", "order_id": order.id}), 201
+        product.stock -= quantity
+        db.session.add(order)
+        db.session.commit()
 
-@bp.route("/", methods=["GET"])
-@jwt_required()
-def get_user_orders():
-    current_user = get_jwt_identity()
-    orders = Order.query.filter_by(buyer_id=current_user["id"]).all()
+        return {"message": "Order placed successfully", "order_id": order.id}, 201
 
-    result = [{
-        "id": o.id,
-        "product_id": o.product_id,
-        "quantity": o.quantity,
-        "total_price": o.total_price,
-        "status": o.status,
-        "created_at": o.created_at
-    } for o in orders]
+    @jwt_required()
+    def get(self):
+        current_user = get_jwt_identity()
+        orders = Order.query.filter_by(buyer_id=current_user["id"]).all()
 
-    return jsonify(result)
+        return [{
+            "id": o.id,
+            "product_id": o.product_id,
+            "quantity": o.quantity,
+            "total_price": o.total_price,
+            "status": o.status,
+            "created_at": o.created_at
+        } for o in orders]
 
-@bp.route("/<int:order_id>", methods=["PUT"])
-@jwt_required()
-def update_order_status(order_id):
-    current_user = get_jwt_identity()
-    order = Order.query.get_or_404(order_id)
-    product = Product.query.get(order.product_id)
+@order_ns.route("/<int:order_id>")
+@order_ns.param('order_id', 'The order ID')
+class OrderDetail(Resource):
+    @order_ns.expect(status_model)
+    @jwt_required()
+    def put(self, order_id):
+        current_user = get_jwt_identity()
+        order = Order.query.get_or_404(order_id)
+        product = Product.query.get(order.product_id)
 
-    if product.seller_id != current_user["id"]:
-        return jsonify({"message": "Unauthorized"}), 403
+        if product.seller_id != current_user["id"]:
+            return {"message": "Unauthorized"}, 403
 
-    data = request.get_json()
-    order.status = data.get("status", order.status)
+        data = request.get_json()
+        order.status = data.get("status", order.status)
 
-    db.session.commit()
-    return jsonify({"message": "Order status updated"})
+        db.session.commit()
+        return {"message": "Order status updated"}
 
-@bp.route("/<int:order_id>", methods=["DELETE"])
-@jwt_required()
-def cancel_order(order_id):
-    current_user = get_jwt_identity()
-    order = Order.query.get_or_404(order_id)
+    @jwt_required()
+    def delete(self, order_id):
+        current_user = get_jwt_identity()
+        order = Order.query.get_or_404(order_id)
 
-    if order.buyer_id != current_user["id"]:
-        return jsonify({"message": "Unauthorized"}), 403
+        if order.buyer_id != current_user["id"]:
+            return {"message": "Unauthorized"}, 403
 
-    if order.status != "pending":
-        return jsonify({"message": "Cannot cancel this order"}), 400
+        if order.status != "pending":
+            return {"message": "Cannot cancel this order"}, 400
 
-    # Kembalikan stok
-    product = Product.query.get(order.product_id)
-    product.stock += order.quantity
+        product = Product.query.get(order.product_id)
+        product.stock += order.quantity
 
-    db.session.delete(order)
-    db.session.commit()
-    return jsonify({"message": "Order canceled"})
+        db.session.delete(order)
+        db.session.commit()
+        return {"message": "Order canceled"}

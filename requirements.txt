@@ -5,5 +5,6 @@ Flask-CORS==4.0.0
 psycopg2-binary==2.9.9
 python-dotenv==1.0.1
 pytest==8.1.1
-Werkzeug==3.0.1
+werkzeug==2.3.7
 alembic==1.13.1
+flask-restx==1.1.0
