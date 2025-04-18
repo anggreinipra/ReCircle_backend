@@ -1,0 +1,11 @@
+id,name,email,password,role,created_at
+1,John Doe,john.doe@example.com,hashedpassword1,user,4/18/2025 10:00
+2,Jane Smith,jane.smith@example.com,hashedpassword2,admin,4/18/2025 10:05
+3,Robert Lee,robert.lee@example.com,hashedpassword3,user,4/18/2025 10:10
+4,Alice Kim,alice.kim@example.com,hashedpassword4,user,4/18/2025 10:15
+5,Michael Sun,michael.sun@example.com,hashedpassword5,admin,4/18/2025 10:20
+6,Sarah Brown,sarah.brown@example.com,hashedpassword6,user,4/18/2025 10:25
+7,James King,james.king@example.com,hashedpassword7,user,4/18/2025 10:30
+8,Emily Clark,emily.clark@example.com,hashedpassword8,user,4/18/2025 10:35
+9,David West,david.west@example.com,hashedpassword9,user,4/18/2025 10:40
+10,Olivia Joy,olivia.joy@example.com,hashedpassword10,admin,4/18/2025 10:45
