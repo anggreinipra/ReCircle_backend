@@ -1,10 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
-from flask import Flask
-import os
 
 db = SQLAlchemy()
 
-def init_db(app: Flask):
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+def init_db(app):
     db.init_app(app)

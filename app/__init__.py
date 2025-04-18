@@ -3,17 +3,12 @@ from flask_cors import CORS
 from app.database import init_db
 from app.utils.auth import jwt
 from flask_restx import Api
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
+from app.config import Config
 
 def create_app():
     app = Flask(__name__)
 
-    app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config.from_object(Config)
 
     init_db(app)
     jwt.init_app(app)
