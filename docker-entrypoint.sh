@@ -1,7 +1,8 @@
 #!/bin/sh
 
-# Run alembic migration
-alembic upgrade head
-
-# Run aplikasi Flask
-flask run --host=0.0.0.0
+if [ "$1" = "migrate" ]; then
+  alembic upgrade head
+else
+  alembic upgrade head
+  flask run --host=0.0.0.0
+fi

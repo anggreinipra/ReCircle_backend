@@ -22,4 +22,9 @@ def create_app():
     app.register_blueprint(orders.bp)
     app.register_blueprint(community.bp)
 
+    @app.route("/")
+    def home():
+        return {"message": "Welcome to ReCircle API!"}
+
     return app
+
