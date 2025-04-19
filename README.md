@@ -168,6 +168,8 @@ In Supabase, you can also use the GUI to view your tables and data. Also, you ca
 7. Set environment variables on Koyeb (same as .env)
 8. Koyeb will auto-deploy on every push!
 
+link https://swift-milly-revou-paris-9fcb3f87.koyeb.app/
+
 ## 📚 API Documentation (Swagger UI)
 
 After the app is running, navigate to:
